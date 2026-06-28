@@ -41,6 +41,8 @@ class Candidate(Base):
 
     resume_url = Column(String(500))
 
+    resume_file_path = Column(String(500))
+
     resume_text = Column(Text)
 
     status = Column(
