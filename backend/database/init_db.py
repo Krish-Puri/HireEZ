@@ -7,8 +7,10 @@ Creates every table defined in models.
 from backend.database.base import Base
 from backend.database.connection import engine
 
-# Import every model here
 from backend.models.candidate import Candidate
+from backend.models.job import Job
+from backend.models.evaluation import Evaluation
+from backend.models.test_result import TestResult
 
 
 def init_database():

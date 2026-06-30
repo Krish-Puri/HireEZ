@@ -27,6 +27,9 @@ class JobRepository:
     def get_all(self, db: Session) -> List[Job]:
         return db.query(Job).order_by(Job.id).all()
 
+    def get_first(self, db: Session) -> Job | None:
+        return db.query(Job).order_by(Job.id).first()
+
     def delete(self, db: Session, job_id: int) -> bool:
         job = self.get(db, job_id)
         if not job:

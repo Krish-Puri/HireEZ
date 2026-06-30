@@ -58,6 +58,7 @@ class PromptBuilder:
             "  \"education_score\": 0,\n"
             "  \"research_score\": 0,\n"
             "  \"communication_score\": 0,\n"
+            "  \"best_project\": \"\",\n"
             "  \"strengths\": [],\n"
             "  \"concerns\": [],\n"
             "  \"missing_skills\": [],\n"

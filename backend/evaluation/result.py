@@ -11,6 +11,7 @@ class EvaluationResult:
     education_score: float
     research_score: float
     communication_score: float
+    best_project: str = ""
     strengths: list[str] = field(default_factory=list)
     concerns: list[str] = field(default_factory=list)
     missing_skills: list[str] = field(default_factory=list)

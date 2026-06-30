@@ -13,7 +13,7 @@ class Job(Base):
     title = Column(String(150), nullable=False)
     company = Column(String(150), nullable=False)
     department = Column(String(100))
-    description = Column(Text, nullable=False)
+    description = Column(Text)
     required_skills = Column(Text)
     preferred_skills = Column(Text)
     minimum_cgpa = Column(String(10))

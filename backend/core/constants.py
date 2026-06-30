@@ -10,6 +10,10 @@ class CandidateStatus:
 
     AI_EVALUATION = "AI Evaluation"
 
+    AI_EVALUATED = "AI Evaluated"
+
+    FAILED = "Failed"
+
     RANKED = "Ranked"
 
     INTERVIEW = "Interview Scheduled"

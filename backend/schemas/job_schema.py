@@ -9,10 +9,10 @@ class JobCreate(BaseModel):
     title: str
     company: str
     department: str | None = None
-    description: str
+    description: str | None = None
     required_skills: str | None = None
     preferred_skills: str | None = None
-    minimum_cgpa: str | None = None
+    minimum_cgpa: float | None = None
 
 
 class JobResponse(JobCreate):

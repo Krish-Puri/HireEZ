@@ -80,6 +80,59 @@ class CandidateRepository:
             .first()
         )
 
+    def get_by_base_email(
+        self,
+        db: Session,
+        base_email: str
+    ):
+        """
+        Match by base email, ignoring +uuid suffixes.
+        E.g. base_email 'a@b.com' matches 'a+xyz@b.com'.
+        """
+        pattern = base_email.split("@")[0] + "%" + "@" + base_email.split("@")[1]
+        return (
+            db.query(Candidate)
+            .filter(Candidate.email.like(pattern))
+            .first()
+        )
+
+    def get_by_base_email_ordered(
+        self,
+        db: Session,
+        base_email: str
+    ):
+        """
+        Match by base email, returning the candidate with the lowest ID
+        that has not yet been matched this upload session.
+        Tracks already-matched IDs via a module-level set (cleared per request).
+        """
+        import backend.api.test_routes as tr
+
+        pattern = base_email.split("@")[0] + "%" + "@" + base_email.split("@")[1]
+        candidates = (
+            db.query(Candidate)
+            .filter(Candidate.email.like(pattern))
+            .order_by(Candidate.id)
+            .all()
+        )
+        for c in candidates:
+            if c.id not in tr._matched_candidate_ids:
+                tr._matched_candidate_ids.add(c.id)
+                return c
+        return None
+
+    def get_by_id(
+        self,
+        db: Session,
+        candidate_id: int
+    ):
+
+        return (
+            db.query(Candidate)
+            .filter(Candidate.id == candidate_id)
+            .first()
+        )
+
     def get_existing_emails(
         self,
         db: Session

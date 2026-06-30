@@ -10,7 +10,8 @@ from sqlalchemy import (
     String,
     Float,
     Text,
-    DateTime
+    DateTime,
+    ForeignKey,
 )
 
 from sqlalchemy.sql import func
@@ -27,6 +28,8 @@ class Candidate(Base):
 
     email = Column(String(150), unique=True, nullable=False)
 
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=True)
+
     college = Column(String(150))
 
     branch = Column(String(100))
@@ -41,9 +44,23 @@ class Candidate(Base):
 
     resume_url = Column(String(500))
 
+    github_score = Column(Float, default=0)
+
+    github_summary = Column(Text)
+
+    top_languages = Column(Text)
+
     resume_file_path = Column(String(500))
 
     resume_text = Column(Text)
+
+    # Test scores
+    test_la = Column(Float)  # Logical Aptitude Score
+    test_code = Column(Float)  # Coding Test Score
+
+    final_score = Column(Float, default=0)
+
+    candidate_rank = Column(Integer)
 
     status = Column(
         String(50),

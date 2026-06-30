@@ -27,6 +27,7 @@ class ResponseParser:
             "education_score",
             "research_score",
             "communication_score",
+            "best_project",
             "strengths",
             "concerns",
             "missing_skills",

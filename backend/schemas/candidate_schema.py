@@ -24,6 +24,7 @@ class CandidateBase(BaseModel):
     research_work: Optional[str] = None
     github_url: Optional[str] = None
     resume_url: Optional[str] = None
+    job_id: Optional[int] = None
 
 
 # -----------------------------
@@ -40,6 +41,13 @@ class CandidateCreate(CandidateBase):
 
 class CandidateResponse(CandidateBase):
     id: int
+    github_score: Optional[float] = None
+    github_summary: Optional[str] = None
+    top_languages: Optional[str] = None
+    final_score: Optional[float] = None
+    candidate_rank: Optional[int] = None
+    test_la: Optional[float] = None
+    test_code: Optional[float] = None
     status: str
     created_at: datetime
 

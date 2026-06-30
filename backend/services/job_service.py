@@ -19,6 +19,9 @@ class JobService:
     def get_jobs(self, db: Session) -> List:
         return job_repository.get_all(db)
 
+    def get_first_job(self, db: Session):
+        return job_repository.get_first(db)
+
     def delete_job(self, db: Session, job_id: int) -> bool:
         return job_repository.delete(db, job_id)
 
