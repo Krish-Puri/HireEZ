@@ -26,9 +26,9 @@ router = APIRouter(
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-UPLOAD_FOLDER = PROJECT_ROOT / "uploads"
-UPLOAD_FOLDER.mkdir(exist_ok=True)
+# Use /tmp for uploads — Render's filesystem is read-only except /tmp
+UPLOAD_FOLDER = Path("/tmp/hireez-uploads")
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/upload")
