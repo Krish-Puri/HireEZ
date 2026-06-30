@@ -37,3 +37,9 @@ app.add_exception_handler(
     HireEZException,
     hireez_exception_handler
 )
+
+
+@app.on_event("startup")
+def on_startup():
+    from backend.database.init_db import init_database
+    init_database()
