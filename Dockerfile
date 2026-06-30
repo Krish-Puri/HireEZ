@@ -21,4 +21,4 @@ ENV PORT=8002
 EXPOSE $PORT
 
 # Run uvicorn — reads PORT from environment (Render sets this)
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT
