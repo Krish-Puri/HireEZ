@@ -1,0 +1,12 @@
+{
+  "name": "hireez-backend",
+  "version": "1.0.0",
+  "framework": "python",
+  "region": "us-east-1",
+  "buildCommand": "pip install -r requirements.txt",
+  "startCommand": "uvicorn backend.main:app --host 0.0.0.0 --port $PORT",
+  "health": "/health",
+  "environment": {
+    "PYTHON_VERSION": "3.11"
+  }
+}

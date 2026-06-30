@@ -30,6 +30,8 @@ services:
       mysql:
         condition: service_healthy
     restart: unless-stopped
+    profiles:
+      - local
 
   frontend:
     build:
@@ -42,6 +44,8 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    profiles:
+      - local
 
   mysql:
     image: mysql:8.0
@@ -58,6 +62,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    profiles:
+      - local
 
 volumes:
   mysql_data:

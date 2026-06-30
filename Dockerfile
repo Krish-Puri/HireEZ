@@ -1,4 +1,4 @@
-# HireEZ — FastAPI Backend Dockerfile
+# HireEZ — FastAPI Backend Dockerfile (Cyclic + PlanetScale compatible)
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -14,10 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY backend/ ./backend/
-COPY .env.example .env 2>/dev/null || true
 
-# Expose port
-EXPOSE 8002
+# Cyclic sets PORT env var; fallback to 8002 for local dev
+ENV PORT=8002
 
-# Run uvicorn
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8002"]
+EXPOSE $PORT
+
+# Run uvicorn — reads PORT from environment (Cyclic sets this)
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "$PORT"]

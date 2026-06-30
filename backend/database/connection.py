@@ -11,6 +11,7 @@ Used throughout the project.
 Author: HireEZ
 """
 
+import os
 from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine
@@ -18,6 +19,17 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.config import config
 
+
+ssl_params = {}
+# PlanetScale and other cloud MySQL providers require SSL
+if os.getenv("DB_SSL", "").lower() in ("true", "1", "yes"):
+    ssl_params = {
+        "connect_args": {
+            "ssl": {
+                "rejectUnauthorized": True,
+            }
+        }
+    }
 
 
 DATABASE_URL = (
@@ -27,15 +39,17 @@ DATABASE_URL = (
     f"{config.DB_HOST}:"
     f"{config.DB_PORT}/"
     f"{config.DB_NAME}"
+    f"?ssl={'rejectUnauthorized=True' if os.getenv('DB_SSL', '').lower() in ('true','1','yes') else ''}"
 )
 
 
 engine = create_engine(
     DATABASE_URL,
-    echo=True,              # We'll change to False in production
+    echo=False,
     pool_pre_ping=True,
     pool_recycle=3600,
-    future=True
+    future=True,
+    **ssl_params,
 )
 
 
