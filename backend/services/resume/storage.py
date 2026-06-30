@@ -7,14 +7,10 @@ Responsible for generating local resume paths.
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+# Use /tmp for resumes — Render's filesystem is read-only except /tmp
+RESUME_DIRECTORY = Path("/tmp/hireez-resumes")
 
-RESUME_DIRECTORY = PROJECT_ROOT / "storage" / "resumes"
-
-RESUME_DIRECTORY.mkdir(
-    parents=True,
-    exist_ok=True
-)
+RESUME_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
 
 class ResumeStorage:

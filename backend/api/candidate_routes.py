@@ -158,9 +158,9 @@ async def resume_upload(
             detail=f"A candidate with email '{email}' already exists. Please use a unique email address."
         )
 
-    # Save PDF resume
-    RESUME_FOLDER = PROJECT_ROOT / "resumes"
-    RESUME_FOLDER.mkdir(exist_ok=True)
+    # Save PDF resume to /tmp — Render filesystem is read-only except /tmp
+    RESUME_FOLDER = Path("/tmp/hireez-resumes")
+    RESUME_FOLDER.mkdir(parents=True, exist_ok=True)
 
     file_ext = ".pdf"
     safe_email = email.lower().replace("@", "_at_").replace(".", "_")

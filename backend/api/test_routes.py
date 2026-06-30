@@ -31,9 +31,9 @@ router = APIRouter(
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-UPLOAD_FOLDER = PROJECT_ROOT / "uploads"
-UPLOAD_FOLDER.mkdir(exist_ok=True)
+# Use /tmp for uploads — Render's filesystem is read-only except /tmp
+UPLOAD_FOLDER = Path("/tmp/hireez-test-uploads")
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # Tracks candidate IDs already matched during this upload request
 _matched_candidate_ids: set[int] = set()
