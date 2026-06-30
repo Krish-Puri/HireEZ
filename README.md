@@ -125,32 +125,63 @@ Upload Dataset → Job Description → Parse Resumes → AI Evaluation
     → Google Meet Sent
 ```
 
-## Deployment (Railway / Render)
+## Deployment (Render + PlanetScale)
 
-### Using Docker Compose on a VPS
-
-```bash
-# SSH into your server
-git clone https://github.com/Krish-Puri/HireEZ.git
-cd HireEZ
-cp .env.example .env
-# Edit .env with production values
-
-# Update these for production:
-# GOOGLE_REDIRECT_URI=https://your-domain.com/google/oauth/callback
-# FRONTEND_URL=http://your-domain.com:8501
-
-docker-compose -f docker-compose.yml up -d --build
-```
-
-### Using Railway
+### Using Render (Free Python Hosting)
 
 1. Push code to GitHub
-2. Connect repo to [Railway](https://railway.app)
-3. Add environment variables from `.env`
-4. Railway will auto-detect `Dockerfile` and deploy
-5. Add a MySQL plugin (Railway provides it)
-6. Update `API_BASE` env var to your Railway backend URL
+2. Go to [render.com](https://render.com) → Sign up with GitHub
+3. Click **New** → **Web Service** → Connect your `Krish-Puri/HireEZ` repo
+4. Configure:
+   - **Name:** `hireez-backend`
+   - **Region:** Singapore
+   - **Branch:** `main`
+   - **Runtime:** `Python 3`
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `uvicorn backend.main:app --host 0.0.0.0 --port 10000`
+   - **Plan:** Free
+5. Add all environment variables from `.env.example` (set `DB_SSL=true` for PlanetScale)
+6. Click **Create Web Service** → wait for build to complete
+7. Your backend will be live at `https://hireez-backend.onrender.com`
+
+### Using PlanetScale (Free MySQL)
+
+1. Go to [planetscale.com](https://planetscale.com) → Sign up with GitHub
+2. Click **New database** → Name: `hireez` → Choose free tier
+3. Click **Connect** → **General** → Copy the connection string
+4. Add these values to Render environment variables:
+   - `DB_HOST` = host from connection string
+   - `DB_USER` = username
+   - `DB_PASSWORD` = password
+   - `DB_NAME` = `hireez`
+   - `DB_PORT` = `3306`
+   - `DB_SSL` = `true`
+
+### Using Streamlit Cloud (Free Frontend)
+
+1. Create a new GitHub repo called `HireEZ-Frontend`
+2. Push the `frontend/` folder, `.streamlit/`, and `Dockerfile.frontend` to it:
+   ```bash
+   git subtree push --prefix frontend origin frontend
+   ```
+3. Go to [share.streamlit.io](https://share.streamlit.io) → Sign up with GitHub
+4. Click **New app** → Select `HireEZ-Frontend` repo
+5. Set **Main file path:** `app.py`
+6. In **Advanced settings**, add:
+   - `API_BASE` = `https://hireez-backend.onrender.com` (your Render URL)
+7. Click **Deploy**
+
+### Updating Google OAuth for Production
+
+After deploying, update the Google Cloud Console redirect URI:
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) → **APIs & Services** → **Credentials**
+2. Click your **OAuth 2.0 Client ID**
+3. Under **Authorized redirect URIs**, add:
+   ```
+   https://hireez-backend.onrender.com/google/oauth/callback
+   ```
+4. Save
 
 ## Project Structure
 
