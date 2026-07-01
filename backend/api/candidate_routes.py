@@ -128,6 +128,74 @@ async def rank_all(db: Session = Depends(get_db)):
     }
 
 
+@router.post("/rerun-github")
+async def rerun_github(db: Session = Depends(get_db)):
+    """
+    Re-run GitHub analysis for all candidates that don't have a github_score yet.
+    Useful when GitHub analysis failed previously or needs to be refreshed.
+    """
+    import threading
+    from backend.pipeline.stages.github_stage import GithubStage
+
+    all_candidates = candidate_repository.get_all(db)
+    pending = [c for c in all_candidates if c.github_score is None]
+
+    def _run_github_async(candidate_id):
+        from backend.database.connection import SessionLocal
+        session = SessionLocal()
+        try:
+            candidate = session.query(type(all_candidates[0])).get(candidate_id)
+            if candidate:
+                stage = GithubStage()
+                stage.execute(session, candidate)
+        finally:
+            session.close()
+
+    for c in pending:
+        t = threading.Thread(target=_run_github_async, args=(c.id,), daemon=True)
+        t.start()
+
+    return {
+        "success": True,
+        "pending_count": len(pending),
+        "message": f"GitHub analysis re-started for {len(pending)} candidates in the background.",
+    }
+
+
+@router.post("/rerun-ai")
+async def rerun_ai(db: Session = Depends(get_db)):
+    """
+    Re-run AI evaluation for all candidates that don't have a final_score yet.
+    Useful when AI evaluation failed previously or needs to be refreshed.
+    """
+    import threading
+    from backend.pipeline.stages.ai_stage import AIStage
+
+    all_candidates = candidate_repository.get_all(db)
+    pending = [c for c in all_candidates if c.final_score is None]
+
+    def _run_ai_async(candidate_id):
+        from backend.database.connection import SessionLocal
+        session = SessionLocal()
+        try:
+            candidate = session.query(type(all_candidates[0])).get(candidate_id)
+            if candidate:
+                stage = AIStage()
+                stage.execute(session, candidate)
+        finally:
+            session.close()
+
+    for c in pending:
+        t = threading.Thread(target=_run_ai_async, args=(c.id,), daemon=True)
+        t.start()
+
+    return {
+        "success": True,
+        "pending_count": len(pending),
+        "message": f"AI evaluation re-started for {len(pending)} candidates in the background.",
+    }
+
+
 @router.post("/resume-upload")
 async def resume_upload(
     resume: UploadFile = File(...),
