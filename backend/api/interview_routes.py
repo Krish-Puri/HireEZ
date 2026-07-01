@@ -17,6 +17,7 @@ import asyncio
 import concurrent.futures
 
 from backend.database.connection import get_db
+from backend.models.candidate import Candidate
 from backend.repositories.candidate_repository import candidate_repository
 from backend.repositories.test_result_repository import test_result_repository
 from backend.services.email_service import email_service
@@ -68,7 +69,7 @@ def _schedule_one_sync(candidate_id, candidate_email, candidate_name, cand_start
         test_result_repository.update_interview_scheduled(
             session, candidate_id, meet_link, interview_time
         )
-        candidate = session.query(type(candidate_id)).get(candidate_id)
+        candidate = session.query(Candidate).get(candidate_id)
         if candidate:
             candidate.status = "Interview Scheduled"
             session.commit()
