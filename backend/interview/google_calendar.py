@@ -34,7 +34,11 @@ class GoogleCalendarService:
         Use the refresh token to obtain a new access token from Google.
         Returns the new access token or None if refresh fails.
         """
-        if not self.refresh_token or not self.client_id or not self.client_secret:
+        if not self.refresh_token:
+            print("[GOOGLE CAL] No refresh token available")
+            return None
+        if not self.client_id or not self.client_secret:
+            print("[GOOGLE CAL] Missing client_id or client_secret")
             return None
 
         try:
@@ -49,7 +53,11 @@ class GoogleCalendarService:
                 timeout=15,
             )
             if response.status_code == 200:
-                return response.json().get("access_token")
+                access_token = response.json().get("access_token")
+                print(f"[GOOGLE CAL] Access token refreshed successfully")
+                return access_token
+            else:
+                print(f"[GOOGLE CAL] Token refresh failed: {response.status_code} {response.text}")
         except Exception as e:
             print(f"[GOOGLE CAL] Failed to refresh access token: {e}")
         return None
