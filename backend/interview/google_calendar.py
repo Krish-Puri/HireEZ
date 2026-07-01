@@ -71,7 +71,11 @@ class GoogleCalendarService:
             return self._refresh_access_token()
         return self.access_token
 
-    async def create_meet_link(self) -> str:
+    async def create_meet_link(
+        self,
+        start_time: Optional[datetime.datetime] = None,
+        end_time: Optional[datetime.datetime] = None,
+    ) -> str:
         """
         Create a Google Meet link.
         Automatically refreshes the access token if needed.
@@ -89,9 +93,15 @@ class GoogleCalendarService:
             meet_id = f"{seg()}-{seg()}-{seg()}"
             return f"https://meet.google.com/{meet_id}"
 
-        # Create a minimal calendar event with conferenceData to generate a Meet link
+        # Build minimal event with required start/end times for Google Calendar API
+        now = datetime.datetime.utcnow()
+        start = start_time or (now + datetime.timedelta(hours=1))
+        end = end_time or (start + datetime.timedelta(hours=1))
+
         event = {
             "summary": "HireEZ Interview",
+            "start": {"dateTime": start.isoformat(), "timeZone": "UTC"},
+            "end": {"dateTime": end.isoformat(), "timeZone": "UTC"},
             "conferenceData": {
                 "createRequest": {
                     "conferenceSolutionKey": {"type": "hangoutsMeet"},
@@ -129,7 +139,7 @@ class GoogleCalendarService:
         Returns the event details including meet_link.
         """
         if not meet_link:
-            meet_link = await self.create_meet_link()
+            meet_link = await self.create_meet_link(start_time, end_time)
 
         event = {
             "summary": f"Interview: {candidate_name} — {job_title or 'Position'}",
