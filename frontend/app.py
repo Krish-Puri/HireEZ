@@ -27,9 +27,6 @@ import pytz
 import os
 API_BASE = st.secrets.get("API_BASE", os.environ.get("API_BASE", "http://localhost:8002"))
 
-# DEBUG: Remove this line after debugging
-st.write(f"DEBUG: API_BASE = {API_BASE}")
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Session State Defaults
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +229,7 @@ def get_shortlisted_after_test(min_total=50.0):
         return []
 
 def send_test_links(threshold: float = 50.0):
-    return requests.post(f"{API_BASE}/tests/send-test-links", params={"threshold": threshold}, timeout=60).json()
+    return requests.post(f"{API_BASE}/tests/send-test-links", params={"threshold": threshold}, timeout=300).json()
 
 def rank_all():
     return requests.post(f"{API_BASE}/candidates/rank-all", timeout=60).json()

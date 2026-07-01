@@ -60,8 +60,7 @@ async def upload_candidates(
         report = import_service.import_candidates_from_csv(db, str(file_path), job_id=parsed_job_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {type(exc).__name__}: {exc}") from exc
+
     return {
         "success": True,
         "summary": {

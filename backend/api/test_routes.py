@@ -112,13 +112,10 @@ async def send_test_links(
 ):
     """
     Shortlist candidates who passed the AI evaluation (final_score >= threshold)
-    and send them test links via email.
-
-    Query params:
-    - threshold: minimum final_score to be shortlisted (default 50.0)
-    - job_id: (optional) filter by specific job
+    and send them test links via email. Emails are sent asynchronously in
+    background threads to avoid timeout on large candidate lists.
     """
-    import time
+    import threading
 
     test_link = "https://hireez.app/assessment"  # Default placeholder
 
@@ -129,28 +126,32 @@ async def send_test_links(
         and c.final_score >= threshold
     ]
 
-    results = []
-    for candidate in shortlisted:
-        success = email_service.send_test_link(
-            to_email=candidate.email,
-            candidate_name=candidate.name,
-            test_link=test_link,
-        )
-        test_result_repository.upsert(db, candidate.id, None, None)
-        test_result_repository.update_test_link_sent(db, candidate.id, test_link)
-        results.append({
-            "candidate_id": candidate.id,
-            "name": candidate.name,
-            "email": candidate.email,
-            "test_link_sent": success,
-        })
-        # Small delay between sends to avoid SMTP rate limiting
-        time.sleep(0.5)
+    def _send_email_async(candidate_data):
+        from backend.database.connection import SessionLocal
+        session = SessionLocal()
+        try:
+            cid, name, email = candidate_data
+            success = email_service.send_test_link(
+                to_email=email,
+                candidate_name=name,
+                test_link=test_link,
+            )
+            # Update test result record in background
+            test_result_repository.upsert(session, cid, None, None)
+            test_result_repository.update_test_link_sent(session, cid, test_link)
+        finally:
+            session.close()
+
+    # Spawn background threads for each email — do NOT wait
+    candidate_data = [(c.id, c.name, c.email) for c in shortlisted]
+    for data in candidate_data:
+        t = threading.Thread(target=_send_email_async, args=(data,), daemon=True)
+        t.start()
 
     return {
         "success": True,
-        "shortlisted_count": len(results),
-        "results": results,
+        "shortlisted_count": len(shortlisted),
+        "message": f"Emails are being sent to {len(shortlisted)} candidates in the background.",
     }
 
 
