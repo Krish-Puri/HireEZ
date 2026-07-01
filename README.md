@@ -2,6 +2,8 @@
 
 An end-to-end AI recruitment platform that automates candidate screening, evaluation, and interview scheduling using Google Gemini for AI evaluation, GitHub for technical profiling, and Google Calendar with real Meet links for interview scheduling.
 
+**🔗 Live Demo:** [https://hireez-frontend.streamlit.app](https://hireez-frontend.streamlit.app)
+
 ## Features
 
 - **CSV Upload** — Bulk upload candidate datasets with name, email, college, branch, CGPA, GitHub profile, and resume link
