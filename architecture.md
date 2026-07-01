@@ -1,279 +1,452 @@
 # HireEZ — System Architecture Document
 
-> AI-Powered Candidate Screening Platform for **Visl AI Labs — Founding AI Engineer Role**
+> AI-Powered Candidate Screening Platform — Complete System Documentation
 
 ---
 
 ## 1. Overview
 
-HireEZ is a full-stack recruitment platform that automates the end-to-end hiring pipeline using AI evaluation, GitHub analysis, and integrated communication tools. The system progresses candidates automatically from upload through to scheduled interviews.
+HireEZ is a full-stack recruitment platform that automates the end-to-end hiring pipeline: from candidate CSV upload, through AI evaluation and GitHub analysis, to automated interview scheduling with real Google Meet links.
 
-### Workflow
-
-```
-Candidate CSV Upload
-        ↓
-Resume Download & Parsing
-        ↓
-GitHub Profile Analysis
-        ↓
-AI Evaluation (Google Gemini)
-        ↓
-Candidate Ranking
-        ↓
-Shortlist by Score + Send Test Links (Email)
-        ↓
-Upload Test Results (Logical Aptitude + Coding)
-        ↓
-Shortlist Based on Test Performance
-        ↓
-Schedule Interviews (Google Calendar + Meet)
-        ↓
-Send Interview Invitations (Email with Meet Links)
-```
+The system is built as two separate deployments:
+- **Backend API** — FastAPI on Render.com (free tier)
+- **Frontend** — Streamlit on Streamlit Cloud (separate `HireEZ-Frontend` GitHub repo)
 
 ---
 
 ## 2. System Architecture
 
 ```
-┌─────────────────────┐        ┌─────────────────────┐
-│   Streamlit Frontend │◄──────►│     FastAPI API      │
-│   (http://localhost │        │  http://localhost:8000│
-│    :8501)            │        └──────────┬──────────┘
-└─────────────────────┘                   │
-                                           │
-              ┌────────────────────────────┼────────────────────────────┐
-              │                            │                            │
-              ▼                            ▼                            ▼
-    ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
-    │   SQLAlchemy     │         │  Pipeline Engine │         │  External APIs   │
-    │   + MySQL        │         │  (4-stage)      │         │  • Google Gemini│
-    │  (Persistence)   │         └─────────────────┘         │  • GitHub REST  │
-    └─────────────────┘                   │                   │  • Google Calendar
-                                          │                   │  • SMTP Email    │
-                          ┌───────────────┼───────────────┐   └─────────────────┘
-                          ▼               ▼               ▼
-                    ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌────────────┐
-                    │ Resume   │  │  GitHub    │  │   AI     │  │  Ranking   │
-                    │ Stage    │  │  Stage     │  │  Stage   │  │  Stage     │
-                    └──────────┘  └────────────┘  └──────────┘  └────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Streamlit Cloud                                │
+│                    HireEZ-Frontend repo (main)                        │
+│                    share.streamlit.io/{app}                           │
+│                                                                      │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │
+│   │ Upload   │  │ Job Desc │  │ Resume   │  │ AI Evaluation        │ │
+│   │ Dataset  │  │          │  │ Parsing  │  │ (Gemini 2.5 Flash)   │ │
+│   └──────────┘  └──────────┘  └──────────┘  └──────────────────────┘ │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │
+│   │ GitHub   │  │ Score &  │  │ Send     │  │ Schedule Interviews  │ │
+│   │ Analysis │  │ Rank     │  │ Test     │  │ (Google Calendar     │ │
+│   │          │  │          │  │ Links    │  │  + Meet links)       │ │
+│   └──────────┘  └──────────┘  └──────────┘  └──────────────────────┘ │
+└──────────────────────────────────┬───────────────────────────────────┘
+                                   │ HTTPS
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Render.com (Free Tier)                         │
+│                    hireez-backend.onrender.com                        │
+│                                                                      │
+│   FastAPI (uvicorn)                                                  │
+│                                                                      │
+│   ┌──────────────────────────────────────────────────────────────┐   │
+│   │                    API Routes                                 │   │
+│   │   POST /candidates/upload    GET /candidates/                 │   │
+│   │   POST /candidates/rerun-ai  POST /candidates/rerun-github    │   │
+│   │   POST /jobs/                GET /jobs/                       │   │
+│   │   POST /tests/upload-results  POST /tests/send-test-links      │   │
+│   │   POST /interviews/schedule  GET /interviews/                 │   │
+│   └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│   ┌──────────────────────────────────────────────────────────────┐   │
+│   │                 Pipeline Engine (4 stages)                     │   │
+│   │   1. ResumeStage  →  2. GithubStage  →  3. AIStage  →  4.   │   │
+│   │      (download/         (repo analysis)   (Gemini       Ranking│   │
+│   │       extract text)                         evaluation)  Stage  │   │
+│   └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│   ┌──────────────────────────────────────────────────────────────┐   │
+│   │                 External Service Integrations                  │   │
+│   │   Google Gemini (AI)  │  GitHub REST API  │  Google Calendar  │   │
+│   │   SMTP Email          │  TiDB MySQL       │  (Meet links)     │   │
+│   └──────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────┬───────────────────────────────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ▼                              ▼
+         ┌─────────────────────┐       ┌─────────────────────────┐
+         │    TiDB Cloud       │       │   Google Calendar API   │
+         │    MySQL 8.0        │       │   (OAuth 2.0 refresh   │
+         │    (Persistence)     │       │    token flow)         │
+         └─────────────────────┘       └─────────────────────────┘
 ```
 
 ---
 
-## 3. Component Details
+## 3. Frontend — Streamlit
 
-### 3.1 Frontend — Streamlit
+Single `app.py` file (~1000 lines) with 11 sections/pages implemented via sidebar navigation.
 
-**Stack:** Streamlit 1.x, requests, pandas
+| Section | Purpose |
+|---------|---------|
+| Upload Dataset | CSV upload with format preview |
+| Job Description | Create/list/delete job postings |
+| Parse Resumes | Trigger resume download + text extraction |
+| AI Evaluation | View AI scores, re-run evaluation |
+| GitHub Analysis | View GitHub scores, re-run analysis |
+| Score & Rank | View composite rankings |
+| Send Test Links | Email test links to shortlisted candidates |
+| Upload Test Results | Import Logical Aptitude + Coding scores |
+| Shortlist | Filter candidates by test performance |
+| Schedule Interviews | Auto-schedule via Google Calendar + Meet |
+| Interview Status | View scheduled interview details |
 
-**Pages:**
-| Page | Route | Purpose |
-|------|-------|---------|
-| Upload Candidates | `📤` | CSV upload with format preview |
-| Manage Jobs | `💼` | Create / list / delete jobs |
-| Candidate Pipeline | `👥` | Filterable candidate table |
-| Upload Test Results | `📊` | CSV upload for test scores |
-| Shortlist & Send Tests | `✅` | Shortlist + email test links |
-| Schedule Interviews | `📅` | Auto-schedule with Meet links |
-| Interview Status | `📋` | View all interview statuses |
+### Frontend-backend Communication
 
----
-
-### 3.2 Backend API — FastAPI
-
-**Stack:** FastAPI, SQLAlchemy 2.x, uvicorn
-
-**Routers:**
-
-| Router | Prefix | Methods | Purpose |
-|--------|--------|---------|---------|
-| `candidate_routes` | `/candidates` | POST, GET | Upload CSV, list candidates |
-| `job_routes` | `/jobs` | POST, GET, GET/:id, DELETE | Job CRUD |
-| `test_routes` | `/tests` | POST `/upload-results`, POST `/send-test-links`, GET `/shortlisted` | Test score management |
-| `interview_routes` | `/interviews` | POST `/schedule`, GET `/` | Interview scheduling |
+- Frontend calls backend REST API at `API_BASE` (set via Streamlit secrets)
+- All pipeline stages run **server-side** in the FastAPI backend
+- Frontend polls or reloads page to see updated results after pipeline runs
+- Re-run buttons trigger background threads in the API for async reprocessing
 
 ---
 
-### 3.3 Database — MySQL + SQLAlchemy
+## 4. Backend API — FastAPI
 
-**Models:**
+### Database Models
 
-| Model | Table | Purpose |
-|-------|-------|---------|
-| `Candidate` | `candidates` | Core candidate record |
-| `Job` | `jobs` | Job postings |
-| `Evaluation` | `evaluations` | AI evaluation results |
-| `TestResult` | `test_results` | Test scores + interview state |
+| Model | Table | Description |
+|-------|-------|-------------|
+| `Candidate` | `candidates` | Core record: name, email, college, branch, CGPA, GitHub URL, resume URL, all scores, status, rank |
+| `Job` | `jobs` | Job title, required/preferred skills, min CGPA, min test score |
+| `Evaluation` | `evaluations` | AI evaluation results: scores (technical, projects, education, research, communication), summary, strengths, concerns |
+| `TestResult` | `test_results` | test_la, test_code, test_link_sent, interview_scheduled, interview_link, interview_time |
 
-**Candidate Schema (from CSV):**
-```
-Name, Email, College, Branch, CGPA,
-Best AI Project, Research Work, GitHub Profile, Resume Link
-```
+### Candidate Status Flow
 
-**Test Results Schema:**
-```
-Email, test_la (Logical Aptitude), test_code (Coding Test)
-```
-
----
-
-### 3.4 Pipeline Engine — 4-Stage Processor
-
-The pipeline runs synchronously after each candidate is inserted:
-
-```
-PipelineEngine.run(db, candidate)
-    │
-    ├─[1] ResumeStage
-    │       ↓ candidate.resume_text extracted from resume_url
-    │
-    ├─[2] GithubStage
-    │       ↓ GitHubClient fetches repos + languages
-    │       ↓ GitHubRepositoryAnalyzer scores AI projects
-    │
-    ├─[3] AIStage  (most intensive)
-    │       ↓ CandidateIntelligenceEngine extracts profile from resume text
-    │       ↓ AIEvaluator calls Gemini (gemini-2.5-flash)
-    │       ↓ EvaluationResult stored in DB
-    │
-    └─[4] RankingStage
-            ↓ RankingEngine computes weighted score:
-               AI Score (60%) + GitHub (25%) + CGPA (10%) + Research (5%)
-```
-
-**Status Flow:**
 ```
 Uploaded → Resume Parsing → Resume Parsed →
 GitHub Analysis → AI Evaluation → AI Evaluated → Ranked
-                (or Failed at any stage)
+              (or Failed at any stage)
+```
+
+### API Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/candidates/upload` | POST | Upload candidate CSV |
+| `/candidates/` | GET | List all candidates |
+| `/candidates/{id}` | GET | Get single candidate |
+| `/candidates/rerun-ai` | POST | Re-run AI evaluation for candidates with no score (background thread) |
+| `/candidates/rerun-github` | POST | Re-run GitHub analysis for candidates with no score (background thread) |
+| `/jobs/` | GET/POST | List/create jobs |
+| `/jobs/{id}` | GET/DELETE | Get/delete job |
+| `/tests/upload-results` | POST | Upload test score CSV |
+| `/tests/send-test-links` | POST | Email test links to shortlisted candidates (background threads) |
+| `/tests/shortlisted` | GET | Get candidates with AI score above threshold |
+| `/tests/shortlisted-after-test` | GET | Get candidates shortlisted by test performance |
+| `/interviews/schedule` | POST | Schedule interviews via Google Calendar (ThreadPoolExecutor for concurrency) |
+| `/interviews/` | GET | List scheduled interviews |
+| `/google/oauth/login` | GET | Initiate Google OAuth flow |
+| `/google/oauth/callback` | GET | OAuth callback |
+
+---
+
+## 5. Database — SQLAlchemy 2.0 + TiDB Cloud MySQL
+
+### Connection
+
+```python
+# backend/database/connection.py
+engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600)
+```
+
+- SSL enabled (`DB_SSL=true`) for TiDB Cloud connection
+- `pool_pre_ping=True` to handle connection drops
+- Each background thread creates its own `SessionLocal()` to avoid shared state
+
+### Key Indexes
+
+- `Candidate.email` — unique index for candidate matching
+- `Candidate.status` — for filtered queries
+- `Candidate.candidate_rank` — for ordering
+
+---
+
+## 6. Pipeline Engine — 4 Stages
+
+```
+PipelineEngine.run(db, candidate_id, job_id)
+        │
+        ├─[1] ResumeStage
+        │       Downloads PDF from resume_url
+        │       Extracts text via PyMuPDF (fitz)
+        │       Stores in candidate.resume_text
+        │
+        ├─[2] GithubStage
+        │       Fetches GitHub profile via REST API
+        │       Lists repositories, detects AI/ML projects
+        │       Scores: (AI_projects × 40) + (total_repos × 10) + diversity_bonus
+        │       Stores github_score, best_ai_project
+        │
+        ├─[3] AIStage (most intensive)
+        │       CandidateIntelligenceEngine extracts structured profile from resume text
+        │       AIEvaluator builds 5-dimension prompt + rubric
+        │       Gemini 2.5 Flash returns structured JSON scores
+        │       ResponseParser validates + stores Evaluation record
+        │       Scores: Technical Skills, Project Quality, Education, Research, Communication
+        │
+        └─[4] RankingStage
+                RankingEngine computes weighted final_score:
+                  final_score = (ai_score × 0.60) +
+                                (github_score × 0.25) +
+                                (cgpa_normalized × 0.10) +
+                                (research_present × 0.05)
+                Assigns candidate_rank (1 = best)
+```
+
+### Concurrency
+
+- `concurrent.futures.ThreadPoolExecutor(max_workers=10)` in `interview_routes.py`
+- Each scheduling thread: creates its own DB session + `asyncio.new_event_loop()` for async Google Calendar API calls
+- Daemon `threading.Thread` for background AI/GitHub re-runs
+
+---
+
+## 7. Google Calendar + Meet Integration
+
+### OAuth 2.0 Flow
+
+```
+User's Browser → Google Consent Screen
+                      │
+                      ▼ (authorization code)
+              OAuth Playground / Local Server
+                      │
+                      ▼ (code exchange)
+              Google Token Endpoint
+                      │
+                      ▼
+              Refresh Token (stored in env var)
+                      │
+        ┌─────────────┴─────────────┐
+        ▼                           ▼
+  Render Backend              Local Development
+  (GOOGLE_REFRESH_TOKEN)      (same env var)
+        │                           │
+        ▼                           ▼
+  _refresh_access_token() ────► Valid Access Token
+        │                           │
+        └───────────┬───────────────┘
+                    ▼
+            Google Calendar API v3
+            POST /calendars/primary/events
+            + conferenceData.createRequest
+                    │
+                    ▼
+            Real Google Meet Link
+            (hangoutLink in response)
+```
+
+### Key Implementation Details
+
+**`backend/interview/google_calendar.py`** — `GoogleCalendarService`
+
+- `_refresh_access_token()` — POSTs to `https://oauth2.googleapis.com/token` with `grant_type=refresh_token`, exchanges refresh token for fresh access token. Cached in instance.
+- `_get_valid_access_token()` — called before every API request, auto-refreshes if missing
+- `create_meet_link(start_time, end_time)` — creates calendar event with `conferenceData.createRequest` → Google returns real Meet link. Requires `start`/`end` in ISO format.
+- `create_interview_event(...)` — full calendar event with attendees, description, and optional pre-generated Meet link
+- Falls back to random Meet-format ID only if `GOOGLE_REFRESH_TOKEN` is not configured
+
+### Google Meet Link Response
+
+```json
+{
+  "hangoutLink": "https://meet.google.com/abc-defg-hij",
+  "id": "event_id_123",
+  "start": {"dateTime": "2026-07-05T10:00:00Z"},
+  "end":   {"dateTime": "2026-07-05T11:00:00Z"}
+}
 ```
 
 ---
 
-### 3.5 AI Evaluation
+## 8. AI Evaluation — Gemini 2.5 Flash
 
-**Provider:** Google Gemini (`gemini-2.5-flash`) via `google-genai`
+### Provider — `google-genai`
 
-**Prompt Strategy:**
-1. Build prompt from `CandidateProfile` (skills, projects, education, research)
-2. Include `Job` description and required/preferred skills
-3. Include `EvaluationRubric` with score breakdowns
-4. Send to Gemini with structured output instructions
-
-**Scoring Dimensions:**
-- Technical Skills
-- Project Quality
-- Education / CGPA
-- Research Work
-- Communication
-
-**Output:** Structured `EvaluationResult` with scores, summary, strengths, concerns, missing skills, and suggested interview questions.
-
----
-
-### 3.6 GitHub Analysis
-
-**Tool:** GitHub REST API v3 (no GraphQL)
-
-**Analysis per repository:**
-- Detect AI/ML keywords: Machine Learning, Deep Learning, NLP, LLM, TensorFlow, PyTorch, etc.
-- Count and weight AI projects
-- Top languages by byte-count
-
-**GitHub Score Formula:** (AI projects × 40) + (total repos × 10) + language diversity bonus
-
----
-
-### 3.7 Ranking Engine
-
-**Weighted Score:**
-```
-final_score = (ai_score × 0.60) +
-              (github_score × 0.25) +
-              (cgpa_normalized × 0.10) +
-              (research_present × 0.05)
+```python
+from google import genai
+client = genai.Client(api_key=GEMINI_API_KEY)
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=prompt,
+    config=types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=EvaluationResult
+    )
+)
 ```
 
-Candidates are then sorted and assigned `candidate_rank` (1 = best).
+### Prompt Structure — 5 Sections
 
----
+1. **Candidate Profile** — extracted from resume text (skills, projects, education, research)
+2. **Job Description** — role, required skills, preferred skills, min CGPA
+3. **Evaluation Rubric** — score breakdowns for each dimension (1–100)
+4. **Scoring Instructions** — weight allocation, how to handle missing data
+5. **Output Schema** — required JSON structure with scores + free-text feedback
 
-### 3.8 Test & Interview Flow
+### Scoring Dimensions
 
-**Test Results:**
-- `test_la` (Logical Aptitude, 0–100)
-- `test_code` (Coding Test, 0–100)
-- Stored on both `Candidate` and `TestResult` models
+| Dimension | Weight | Description |
+|-----------|--------|-------------|
+| Technical Skills | 60% of AI score | Proficiency in required/preferred skills |
+| Project Quality | major factor | Relevance, depth, impact of AI/ML projects |
+| Education | contextual | CGPA vs requirements, institution reputation |
+| Research Work | bonus | Publications, papers, research contributions |
+| Communication | qualitative | Clarity in resume/answers |
 
-**Shortlisting Logic:**
+### Output Schema
+
+```json
+{
+  "technical_score": 85,
+  "project_score": 80,
+  "education_score": 75,
+  "research_score": 60,
+  "communication_score": 70,
+  "overall_assessment": "Strong candidate with...",
+  "strengths": ["...", "..."],
+  "concerns": ["...", "..."],
+  "missing_skills": ["...", "..."],
+  "suggested_interview_questions": ["?", "?"]
+}
 ```
-AI final_score >= threshold (default 50)
-        ↓
-Email sent with test link
-        ↓
-Test results uploaded via CSV
-        ↓
-(min_test_la + min_test_code) >= threshold
-        ↓
-Interview scheduled
+
+---
+
+## 9. GitHub Analysis
+
+### REST API Endpoints Used
+
+- `GET /users/{username}` — profile info (public_repos, followers)
+- `GET /users/{username}/repos?per_page=100&sort=updated` — repository list
+- `GET /repos/{owner}/{repo}/languages` — language byte counts
+
+### AI/ML Project Detection
+
+Keywords detected in repo names and descriptions:
+`machine learning, deep learning, neural network, NLP, LLM, large language model, computer vision, artificial intelligence, TensorFlow, PyTorch, Keras, scikit-learn, reinforcement learning, generative AI, transformers, BERT, GPT`
+
+### GitHub Score Formula
+
+```
+github_score = (ai_ml_project_count × 40)
+             + (total_repo_count × 10)
+             + (unique_language_count × 5)
+             + (has_ai_ml_top_language ? 20 : 0)
+             + (followers > 50 ? 10 : 0)
 ```
 
-**Interview Scheduling:**
-1. For each eligible candidate: create Google Calendar event via Google Calendar API v3
-2. `conferenceData.createRequest` automatically generates a Google Meet link
-3. Save `interview_link` and `interview_time` to `TestResult`
-4. Send email invitation via SMTP with Meet link and time
+Capped at 100.
 
 ---
 
-## 4. AI Evaluation Approach
+## 10. Ranking Formula
 
-HireEZ uses **Google Gemini 2.5 Flash** for multi-dimensional candidate evaluation:
+```
+final_score = (ai_score × 0.60) + (github_score × 0.25) + (cgpa_normalized × 0.10) + (research_present × 0.05)
+```
 
-1. **Profile Extraction:** Resume text is parsed by `CandidateIntelligenceEngine` into structured data (skills, projects, education, research)
-2. **Context-Aware Prompting:** The prompt includes the specific job description, required skills, and a scoring rubric
-3. **Structured Output:** Gemini returns scores + free-text feedback (strengths, concerns, missing skills, interview questions)
-4. **Explainability:** Each score dimension is returned separately so recruiters can see WHY a candidate scored as they did
+Where:
+- `ai_score` — 0–100 from Gemini evaluation
+- `github_score` — 0–100 from GitHub analysis
+- `cgpa_normalized` — (candidate_cgpa / 10.0) × 100
+- `research_present` — 100 if research work exists, else 0
 
-**Why Gemini?**
-- Fast enough for per-candidate synchronous calls during pipeline execution
-- 1M token context window handles long resumes + job descriptions
-- Function-calling compatible for structured output
-- Cost-effective at scale
-
----
-
-## 5. Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | MySQL connection |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `GITHUB_TOKEN` | GitHub PAT for higher API rate limits |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | Email sending |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google OAuth for Calendar |
-| `FRONTEND_URL` | Public URL of Streamlit app |
+Candidates sorted by `final_score DESC` → assigned `candidate_rank` starting at 1.
 
 ---
 
-## 6. Scalability Considerations
+## 11. Email Sending
 
-- **Async Pipeline:** Pipeline stages can be made async and run on a task queue (Celery/ARQ) for high throughput
-- **GitHub API Rate Limits:** GitHub REST API has a 5,000 req/hr limit for authenticated users — the current implementation respects this
-- **Database:** MySQL with proper indexes on `email`, `status`, and `candidate_rank`
-- **AI Cost:** Gemini Flash pricing is optimal; batch evaluation can be added for bulk reprocessing
-- **Frontend:** Streamlit is suitable for internal tools; for public deployment, consider a React/Next.js frontend
+### Implementation — `backend/services/email_service.py`
+
+- Uses Python `smtplib` with Gmail SMTP (`smtp.gmail.com:587`)
+- App Password authentication (not regular password)
+- HTML email templates for test links and interview invitations
+- All sending runs in background `threading.Thread` to avoid API timeouts
+
+### Render Free Tier Limitation
+
+Gmail SMTP is **blocked** on Render's free tier — outbound connections to port 587 fail with `[Errno 101] Network is unreachable`. Email sending will not work without:
+- Upgrading to Render paid plan, or
+- Using a transactional email API (SendGrid, Mailgun, etc.)
 
 ---
 
-## 7. Deliverables Status
+## 12. Environment Variables Reference
 
-| Deliverable | Status |
-|-------------|--------|
-| Hosted Application | ✅ Streamlit + FastAPI (local; deploy to Railway/Render) |
-| GitHub Repository | ✅ Source code with setup instructions |
-| Architecture Document | ✅ This document |
-| Demo Video | ⏳ Pending |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DB_HOST` | Yes | TiDB Cloud gateway host |
+| `DB_PORT` | Yes | Usually `4000` for TiDB |
+| `DB_NAME` | Yes | Database name (`hireez`) |
+| `DB_USER` | Yes | Database username |
+| `DB_PASSWORD` | Yes | Database password |
+| `DB_SSL` | Yes | Must be `true` for TiDB Cloud |
+| `GEMINI_API_KEY` | Yes | From Google AI Studio |
+| `GITHUB_TOKEN` | Yes | GitHub PAT (classic) with repo, read:user, user:email scopes |
+| `SMTP_HOST` | Yes | `smtp.gmail.com` |
+| `SMTP_PORT` | Yes | `587` |
+| `SMTP_USER` | Yes | Gmail address |
+| `SMTP_PASSWORD` | Yes | Gmail App Password |
+| `EMAIL_FROM` | Yes | Same as SMTP_USER |
+| `GOOGLE_CLIENT_ID` | Yes | Web application OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Yes | Web application OAuth client secret |
+| `GOOGLE_REFRESH_TOKEN` | Yes | OAuth refresh token for Calendar API |
+| `GOOGLE_REDIRECT_URI` | No | Defaults to `http://localhost:8501/oauth/callback` |
+| `FRONTEND_URL` | No | Streamlit Cloud app URL |
+| `API_BASE` | No | Render backend URL |
+
+---
+
+## 13. Deployment Checklist
+
+### Pre-deployment
+
+- [ ] Google Cloud project created + Calendar API enabled
+- [ ] OAuth 2.0 Web application client created
+- [ ] All 3 redirect URIs added to OAuth client
+- [ ] Test user added to OAuth consent screen
+- [ ] Refresh token obtained via OAuth Playground
+- [ ] Gemini API key from AI Studio
+- [ ] GitHub PAT with required scopes
+- [ ] Gmail App Password for SMTP
+- [ ] TiDB Cloud cluster created + connection string
+
+### Render Setup
+
+- [ ] Connect `Krish-Puri/HireEZ` repo
+- [ ] Add all environment variables (including `GOOGLE_REFRESH_TOKEN`)
+- [ ] Build command: `pip install -r requirements.txt`
+- [ ] Start command: `uvicorn backend.main:app --host 0.0.0.0 --port 10000`
+- [ ] Wait for first deploy to complete
+
+### Streamlit Cloud Setup
+
+- [ ] Create `HireEZ-Frontend` GitHub repo
+- [ ] Push `frontend/` folder, `.streamlit/`, `requirements.txt`
+- [ ] Connect repo at share.streamlit.io
+- [ ] Set `API_BASE` in advanced settings
+
+### Post-deployment Verification
+
+- [ ] Upload a test CSV — candidates appear in list
+- [ ] Trigger AI evaluation — scores populate
+- [ ] Click Schedule Interviews — real Meet links generated
+- [ ] Check Render logs for any errors
+
+---
+
+## 14. Troubleshooting
+
+| Problem | Likely Cause | Fix |
+|---------|-------------|-----|
+| Dummy Meet links | `GOOGLE_REFRESH_TOKEN` missing or from wrong OAuth client | Obtain refresh token using your own OAuth client credentials |
+| `401 unauthorized_client` | Refresh token was obtained via OAuth Playground's client, used with different client | Obtain fresh refresh token with correct client credentials |
+| `redirect_uri_mismatch` | OAuth redirect URI not registered in Google Cloud Console | Add `https://developers.google.com/oauthplayground/callback` to authorized URIs |
+| Email fails with `Network unreachable` | Render free tier blocks outbound SMTP | Upgrade Render plan or use SendGrid/Mailgun |
+| Cold start timeout | Render free tier spins down after 15 min | Frontend timeout set to 300s; consider paid tier |
+| SQLAlchemy `type(int)` error | Using `type(candidate_id)` in `session.query()` | Use `session.query(Candidate).get(candidate_id)` |
+| Missing start/end time error | Calendar API called without time range | Always include `start.dateTime` and `end.dateTime` in event body |
