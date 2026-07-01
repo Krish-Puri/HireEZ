@@ -241,7 +241,7 @@ def rank_all():
     return requests.post(f"{API_BASE}/candidates/rank-all", timeout=60).json()
 
 def schedule_interviews(**kwargs):
-    return requests.post(f"{API_BASE}/interviews/schedule", params=kwargs, timeout=60).json()
+    return requests.post(f"{API_BASE}/interviews/schedule", params=kwargs, timeout=300).json()
 
 def create_job(payload):
     return requests.post(f"{API_BASE}/jobs/", json=payload, timeout=10)
