@@ -1,0 +1,4 @@
+s_no,name,email,college,branch,cgpa,test_la,test_code
+1,Student 1,test1@test.com,DTU,CS,8.5,49,90
+2,Student 2,test2@test.com,MIT,EE,9.0,52,87
+3,Student 3,test3@test.com,IIT,ME,8.22,67,82
