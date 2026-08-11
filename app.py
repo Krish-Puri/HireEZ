@@ -473,7 +473,7 @@ if page == "📤  Upload Dataset":
                 with st.spinner("Loading demo data..."):
                     job_id = st.session_state.get("upload_job_id")
                     # Use the original XLSX file to avoid CSV comma-parsing errors
-                    xlsx_path = os.path.join(os.path.dirname(__file__), "..", "candidate_dataset.xlsx")
+                    xlsx_path = os.path.join(os.path.dirname(__file__), "candidate_dataset.xlsx")
                     try:
                         with open(xlsx_path, "rb") as f:
                             xlsx_bytes = f.read()
