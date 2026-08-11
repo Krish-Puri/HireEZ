@@ -38,6 +38,17 @@ DEMO_CANDIDATES_CSV = """s_no,name,email,college,branch,cgpa,best_ai_project,res
 10,Student 10,rishabh.choudhary+hatif@mynachiketa.com,Delhi Technological University,Biotechnology,7.19,"My best AI project was a heartbeat detection system using computer vision and deep learning.I built a real-time pipeline using CNNs, U-Net, OpenCV, and Mediapipe to extract remote photoplethysmography (rPPG) signals from facial videos. By applying Fourier Transform and signal processing, I isolated subtle heartbeat patterns from noise. The model was optimized in TensorFlow for real-time performance, enabling contactless health monitoring. This project combined deep learning, signal processing, and biomedical AI, demonstrating practical applications in telemedicine and remote diagnostics.",,,https://drive.google.com/file/d/1Jxme-nQ1HxJMCBrQ6ErPTGEXb-wMtZ0X/view?usp=drive_link,69,85
 """
 
+DEMO_TEST_RESULTS_CSV = """s_no,name,email,college,branch,cgpa,test_la,test_code
+1,Student 1,rishabh.choudhary+hatif@mynachiketa.com,Delhi Technological University,Engineering Physics,7,49,90
+2,Student 2,rishabh.choudhary+hatif@mynachiketa.com,Delhi Technological University,Electronics & Communication Engineering,6.6,52,87
+3,Student 3,rishabh.choudhary+hatif@mynachiketa.com,Delhi Technological University,Computer Science and Engineering,8.22,66,58
+5,Student 5,rishabh.choudhary+hatif@mynachiketa.com,Delhi Technological University,Electronics and Communication,7.71,51,75
+6,Student 6,rishabh.choudhary+hatif@mynachiketa.com,Delhi Technological University,Software Engineering,7.3,48,59
+7,Student 7,rishabh.choudhary+hatif@mynachiketa.com,Delhi Technological University,Mathematics and Computing,7.37,61,55
+8,Student 8,rishabh.choudhary+hatif@mynachiketa.com,Netaji Subhas University of Technology,CSAI,6.5,75,89
+9,Student 9,rishabh.choudhary+hatif@mynachiketa.com,netaji subhas university of technology,instrumentation and control,6.6,50,70
+"""
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +68,8 @@ if "test_upload_done" not in st.session_state:
     st.session_state["test_upload_done"] = False
 if "rank_done" not in st.session_state:
     st.session_state["rank_done"] = False
+if "demo_candidates_loaded" not in st.session_state:
+    st.session_state["demo_candidates_loaded"] = False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dark Theme CSS
@@ -272,6 +285,57 @@ def clear_cache():
     get_shortlisted_after_test.clear()
 
 
+def _display_candidate_result(result: dict):
+    """Render candidate upload result — single clear presentation."""
+    s = result["summary"]
+    inserted = s.get("inserted", 0)
+    duplicates = s.get("duplicates", 0)
+    invalid = s.get("invalid_rows", 0)
+
+    if inserted > 0:
+        msg = f"✅  **{inserted}** candidate(s) added to the pipeline"
+        if duplicates > 0:
+            msg += f"  ·  **{duplicates}** duplicate(s) skipped"
+        if invalid > 0:
+            msg += f"  ·  **{invalid}** row(s) failed"
+        st.success(msg)
+    else:
+        if duplicates > 0:
+            st.warning(f"⚠️  All rows were duplicates — no new candidates added. ({duplicates} skipped)")
+        elif invalid > 0:
+            st.warning(f"⚠️  No candidates added. {invalid} row(s) had invalid or missing data.")
+        else:
+            st.warning("⚠️  No candidates were added.")
+
+    if result.get("errors"):
+        with st.expander(f"⚠️  {len(result['errors'])} error(s)", expanded=False):
+            for err in result["errors"][:10]:
+                st.write(f"• Row {err.get('row','?')}: {err.get('error','Unknown')}")
+
+
+def _display_test_result(result: dict):
+    """Render test-result upload result — single clear presentation."""
+    s = result["summary"]
+    updated = s.get("updated", 0)
+    not_found = s.get("not_found", 0)
+
+    if updated > 0:
+        msg = f"✅  **{updated}** candidate(s) updated with test scores"
+        if not_found > 0:
+            msg += f"  ·  **{not_found}** email(s) not matched"
+        st.success(msg)
+    else:
+        if not_found > 0:
+            st.warning(f"⚠️  No candidates updated. {not_found} email(s) did not match any candidate.")
+        else:
+            st.warning("⚠️  No candidates were updated.")
+
+    if result.get("errors"):
+        with st.expander(f"⚠️  {len(result['errors'])} error(s)", expanded=False):
+            for err in result["errors"][:10]:
+                st.write(f"• Row {err.get('row','?')}: {err.get('error','Unknown')}")
+
+
 def get_filtered_candidates():
     """Return candidates filtered by the active job selection."""
     all_candidates = get_candidates()
@@ -400,26 +464,27 @@ if page == "📤  Upload Dataset":
         st.markdown("**— or —**")
         col_demo, _ = st.columns([1, 2])
         with col_demo:
-            if st.button("🎲  Load Demo Data", type="secondary", width="stretch"):
+            if st.button(
+                "🎲  Load Demo Data",
+                type="secondary",
+                width="stretch",
+                disabled=st.session_state.get("demo_candidates_loaded", False),
+            ):
                 with st.spinner("Loading demo data..."):
                     job_id = st.session_state.get("upload_job_id")
-                    candidates_bytes = DEMO_CANDIDATES_CSV.encode("utf-8")
-                    result = post_candidates_csv(candidates_bytes, "demo_candidates.csv", job_id)
-                    if result.get("success"):
-                        st.success(f"✅  Demo data loaded! {result['summary']['inserted']} candidates added to the pipeline.")
-                        s = result["summary"]
-                        r1, r2, r3, r4, r5 = st.columns(5)
-                        r1.metric("Total Rows",  s["total_rows"])
-                        r2.metric("Inserted",    s["inserted"])
-                        r3.metric("Duplicates",  s["duplicates"])
-                        r4.metric("Valid",       s["valid_candidates"])
-                        r5.metric("Invalid",    s["invalid_rows"])
-                        if result.get("errors"):
-                            with st.expander("⚠️  Errors"):
-                                for err in result["errors"][:20]:
-                                    st.write(err)
+                    # Use the original XLSX file to avoid CSV comma-parsing errors
+                    xlsx_path = os.path.join(os.path.dirname(__file__), "..", "candidate_dataset.xlsx")
+                    try:
+                        with open(xlsx_path, "rb") as f:
+                            xlsx_bytes = f.read()
+                        result = post_candidates_csv(xlsx_bytes, "demo_candidates.xlsx", job_id)
+                    except FileNotFoundError:
+                        st.error("❌  Demo file not found. Please ensure `candidate_dataset.xlsx` is in the repo root.")
+                        result = None
+                    if result and result.get("success"):
+                        st.session_state["demo_candidates_loaded"] = True
+                        _display_candidate_result(result)
                         clear_cache()
-                        st.rerun()
                     else:
                         st.error(f"❌  Failed to load demo data: {result}")
 
@@ -436,18 +501,7 @@ if page == "📤  Upload Dataset":
                 job_id = st.session_state.get("upload_job_id")
                 result = post_candidates_csv(file_bytes, uploaded.name, job_id=job_id)
             if result.get("success"):
-                st.success(f"✅  Dataset uploaded! {result['summary']['inserted']} new candidates added to the pipeline.")
-                s = result["summary"]
-                r1, r2, r3, r4, r5 = st.columns(5)
-                r1.metric("Total Rows",   s["total_rows"])
-                r2.metric("Inserted",     s["inserted"])
-                r3.metric("Duplicates",   s["duplicates"])
-                r4.metric("Valid",        s["valid_candidates"])
-                r5.metric("Invalid",     s["invalid_rows"])
-                if result.get("errors"):
-                    with st.expander("⚠️  Errors"):
-                        for err in result["errors"][:20]:
-                            st.write(err)
+                _display_candidate_result(result)
                 st.info("👉  Move to the next step: **Job Description**")
                 clear_cache()
             else:
@@ -826,6 +880,20 @@ elif page == "📊  Upload Test Results":
         st.markdown("---")
         st.markdown("**⚠️  Column names must be exactly:** `Email`, `test_la`, `test_code`")
 
+    # Demo data loader
+    st.markdown("**— or —**")
+    col_demo, _ = st.columns([1, 2])
+    with col_demo:
+        if st.button("🎲  Use Demo Data", type="secondary", width="stretch"):
+            with st.spinner("Loading demo test results..."):
+                test_bytes = DEMO_TEST_RESULTS_CSV.encode("utf-8")
+                result = post_test_results(test_bytes, "demo_test_results.csv")
+                if result.get("success"):
+                    _display_test_result(result)
+                    clear_cache()
+                else:
+                    st.error(f"❌  Failed to load demo data: {result}")
+
     st.markdown("---")
     uploaded = st.file_uploader("Drop test results CSV", type=["csv"])
 
@@ -834,20 +902,11 @@ elif page == "📊  Upload Test Results":
             st.session_state["test_upload_done"] = True
             result = post_test_results(uploaded.getvalue(), uploaded.name)
             if result.get("success"):
-                st.success("✅  Test results uploaded!")
+                _display_test_result(result)
                 st.session_state["test_upload_done"] = True
             else:
                 st.session_state["test_upload_done"] = False
-                st.error("❌  Upload failed")
-            s = result["summary"]
-            r1, r2, r3 = st.columns(3)
-            r1.metric("Total Rows",  s["total_rows"])
-            r2.metric("Updated",     s["updated"])
-            r3.metric("Not Found",  s["not_found"])
-            if result.get("errors"):
-                with st.expander("⚠️  Errors"):
-                    for err in result["errors"][:20]:
-                        st.write(err)
+                st.error(f"❌  Upload failed: {result}")
             clear_cache()
         else:
             st.error(f"❌  Failed: {result}")
