@@ -19,4 +19,4 @@ uploads/
 resumes/
 
 # Streamlit
-.streamlit/secrets.toml
+frontend/.streamlit/secrets.toml
